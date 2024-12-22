@@ -53,35 +53,32 @@ if ($ResultCode == 0 && isset($data->Body->stkCallback->CallbackMetadata->Item))
         break;
     }
   }
+}
 
-  // Query to insert successful transaction
-  $query = "INSERT INTO transactions 
-              (MerchantRequestID, CheckoutRequestID, ResultCode, ResultDesc, Amount, MpesaReceiptNumber, PhoneNumber) 
-              VALUES 
-              ('$MerchantRequestID', '$CheckoutRequestID', '$ResultCode', '$ResultDesc', '$Amount', '$TransactionId', '$PhoneNumber')";
-} elseif ($ResultCode == 1032) {
-  // Query to handle cancelled transactions
-  $query = "INSERT INTO transactions 
-              (MerchantRequestID, CheckoutRequestID, ResultCode, ResultDesc) 
-              VALUES 
-              ('$MerchantRequestID', '$CheckoutRequestID', '$ResultCode', 'Request cancelled by user')";
-} elseif ($ResultCode == 1037) {
-  // Query to handle timeout transactions
-  $query = "INSERT INTO transactions 
-              (MerchantRequestID, CheckoutRequestID, ResultCode, ResultDesc) 
-              VALUES 
-              ('$MerchantRequestID', '$CheckoutRequestID', '$ResultCode', 'Timeout: User cannot be reached')";
+// Define the base query
+$base_query = "INSERT INTO transactions (MerchantRequestID, CheckoutRequestID, ResultCode, ResultDesc";
+
+// Add Amount, TransactionId, and PhoneNumber for successful transactions
+if ($ResultCode == 0) {
+    $query = "$base_query, Amount, TransactionId, PhoneNumber) VALUES ('$MerchantRequestID', '$CheckoutRequestID', '$ResultCode', '$ResultDesc', '$Amount', '$TransactionId', '$PhoneNumber')";
 } else {
-  // Query to handle other unknown scenarios
-  $query = "INSERT INTO transactions 
-              (MerchantRequestID, CheckoutRequestID, ResultCode, ResultDesc) 
-              VALUES 
-              ('$MerchantRequestID', '$CheckoutRequestID', '$ResultCode', '$ResultDesc')";
+    // Handle specific error codes
+    switch ($ResultCode) {
+        case 1032:
+            $result_desc = 'Request cancelled by user';
+            break;
+        case 1037:
+            $result_desc = 'Timeout: User cannot be reached';
+            break;
+        default:
+            $result_desc = $ResultDesc;
+    }
+    $query = "$base_query) VALUES ('$MerchantRequestID', '$CheckoutRequestID', '$ResultCode', '$result_desc')";
 }
 
 // Execute the query and handle errors
 if (mysqli_query($db, $query)) {
-  error_log("Transaction saved successfully: $MerchantRequestID\n", 3, $logFile);
+    error_log("Transaction saved successfully: $MerchantRequestID\n", 3, $logFile);
 } else {
-  error_log("Error saving transaction: " . mysqli_error($db) . "\n", 3, $logFile);
+    error_log("Error saving transaction: " . mysqli_error($db) . "\n", 3, $logFile);
 }
